@@ -23,6 +23,7 @@ import (
 
 const (
 	defaultTag                = "latest"
+	defaultIndexURL           = "registry-1.docker.io"
 	schemaVersion             = "0.7.0"
 	appcDockerV1RegistryURL   = "appc.io/docker/v1/registryurl"
 	appcDockerV1Repository    = "appc.io/docker/v1/repository"
@@ -41,6 +42,14 @@ func ParseDockerURL(arg string) *types.ParsedDockerURL {
 		tag = defaultTag
 	}
 	indexURL, imageName := SplitReposName(taglessRemote)
+
+	if indexURL == "" && !strings.Contains(imageName, "/") {
+		imageName = "library/" + imageName
+	}
+
+	if indexURL == "" {
+		indexURL = defaultIndexURL
+	}
 
 	return &types.ParsedDockerURL{
 		IndexURL:  indexURL,
@@ -107,9 +116,9 @@ func GenerateManifest(layerData types.DockerImageData, dockerURL *types.ParsedDo
 
 	appURL := ""
 	// omit docker hub index URL in app name
-	if dockerURL.IndexURL != defaultIndex {
-		appURL = dockerURL.IndexURL + "/"
-	}
+	//if dockerURL.IndexURL != defaultIndex {
+	appURL = dockerURL.IndexURL + "/"
+	//}
 	appURL += dockerURL.ImageName + "-" + layerData.ID
 	appURL, err := appctypes.SanitizeACIdentifier(appURL)
 	if err != nil {
@@ -165,7 +174,9 @@ func GenerateManifest(layerData types.DockerImageData, dockerURL *types.ParsedDo
 		annotations = append(annotations, appctypes.Annotation{Name: *commentKey, Value: layerData.Comment})
 	}
 
-	annotations = append(annotations, appctypes.Annotation{Name: *appctypes.MustACIdentifier(appcDockerV1RegistryURL), Value: dockerURL.IndexURL})
+	if dockerURL.IndexURL != "" {
+		annotations = append(annotations, appctypes.Annotation{Name: *appctypes.MustACIdentifier(appcDockerV1RegistryURL), Value: dockerURL.IndexURL})
+	}
 	annotations = append(annotations, appctypes.Annotation{Name: *appctypes.MustACIdentifier(appcDockerV1Repository), Value: dockerURL.ImageName})
 	annotations = append(annotations, appctypes.Annotation{Name: *appctypes.MustACIdentifier(appcDockerV1ImageID), Value: layerData.ID})
 	annotations = append(annotations, appctypes.Annotation{Name: *appctypes.MustACIdentifier(appcDockerV1ParentImageID), Value: layerData.Parent})
@@ -207,9 +218,9 @@ func GenerateManifest(layerData types.DockerImageData, dockerURL *types.ParsedDo
 	if layerData.Parent != "" {
 		indexPrefix := ""
 		// omit docker hub index URL in app name
-		if dockerURL.IndexURL != defaultIndex {
-			indexPrefix = dockerURL.IndexURL + "/"
-		}
+		//if dockerURL.IndexURL != defaultIndex {
+		indexPrefix = dockerURL.IndexURL + "/"
+		//}
 		parentImageNameString := indexPrefix + dockerURL.ImageName + "-" + layerData.Parent
 		parentImageNameString, err := appctypes.SanitizeACIdentifier(parentImageNameString)
 		if err != nil {
